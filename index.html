@@ -97,6 +97,8 @@ button, input, select { font: inherit; color: inherit; }
 .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
 .btn.primary:hover { filter: brightness(1.06); }
 .btn[disabled] { opacity: .55; cursor: progress; }
+.btn.armed { border-color: var(--warn); color: var(--warn); background: var(--warn-bg); }
+.btn.armed .wide { display: none; }
 
 /* ---------- Work area ---------- */
 .work { display: grid; grid-template-columns: var(--panel-w) minmax(0, 1fr); min-height: 0; }
@@ -197,6 +199,7 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 
 .plan .ext { stroke: var(--muted); stroke-width: .6; stroke-dasharray: 2 2; fill: none; }
 
 .tips { font-size: 12.5px; color: var(--muted); margin: 0; }
+@media (max-width: 860px) { .bar-actions .wide { display: none; } }
 .foot-note { display: grid; gap: 10px; padding-top: 16px; font-size: 12.5px; color: var(--muted); }
 .foot-note p { margin: 0; max-width: 62ch; }
 .file-row { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -675,15 +678,33 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 
     }
   }
 
+  // Each warning names the setting that tripped it, where that setting lives and
+  // what to do about it. A warning you cannot act on is just noise.
   function warnings(input) {
     const p = sanitize(input), w = [];
+    const n1 = v => v.toFixed(1);
     const ratioW = p.ballWidth / p.length, ratioH = p.heelWidth / p.ballWidth;
-    if (ratioW < 0.32 || ratioW > 0.46) w.push('Ball width is unusual for this foot length. Most feet are 34–42% as wide as they are long — check the measurement.');
-    if (ratioH < 0.55 || ratioH > 0.85) w.push('Heel width is usually 60–80% of the ball width. Measure the heel about 2–3 cm forward from the back.');
-    if (p.archHeight > 22) w.push('Arch heights above about 20 mm feel aggressive for most people. Start lower and go up 2 mm at a time.');
-    if (Math.abs(p.rearPost) > 6 || Math.abs(p.forePost) > 6) w.push('Posts steeper than 6° are uncommon outside a podiatrist\'s prescription.');
-    if (p.metPad > 0 && p.coverage === '3q' && p.metPadPos > 64) w.push('The met pad sits at the very end of a 3/4 shell. Move it back or choose sulcus or full length.');
-    if (p.style === 'shell' && p.shellThick < 2.5 && p.material !== 'tpu') w.push('Rigid shells under 2.5 mm can crack. Use 2.5–3.5 mm for PETG or PLA.');
+    if (ratioW < 0.32 || ratioW > 0.46) {
+      w.push(`Ball width is ${Math.round(ratioW * 100)}% of the foot length, and most feet are 34–42%. Check ball width and foot length under Your foot.`);
+    }
+    if (ratioH < 0.55 || ratioH > 0.85) {
+      w.push(`Heel width is ${Math.round(ratioH * 100)}% of the ball width, and it is usually 60–80%. Re-measure the heel about 2–3 cm forward from the back and set it under Your foot.`);
+    }
+    if (p.archHeight > 22) {
+      w.push(`Arch height is ${n1(p.archHeight)} mm. Above about 20 mm feels aggressive for most people: lower it under Arch and go back up 2 mm at a time.`);
+    }
+    if (Math.abs(p.rearPost) > 6) {
+      w.push(`Rearfoot post is ${n1(p.rearPost)}°, which tilts the heel by about ${n1(Math.abs(Math.tan((p.rearPost * Math.PI) / 180) * p.heelWidth))} mm across. Anything past 6° is uncommon unless a podiatrist measured you for it: set it back under Heel.`);
+    }
+    if (Math.abs(p.forePost) > 6) {
+      w.push(`Forefoot post is ${n1(p.forePost)}°, which tilts the forefoot by about ${n1(Math.abs(Math.tan((p.forePost * Math.PI) / 180) * p.ballWidth))} mm across. Anything past 6° is uncommon unless a podiatrist measured you for it: set it back under Forefoot.`);
+    }
+    if (p.metPad > 0 && p.coverage === '3q' && p.metPadPos > 64) {
+      w.push('The met pad sits at the very end of a 3/4 shell. Move metatarsal pad position back under Forefoot, or switch the orthotic to sulcus or full length under Your foot.');
+    }
+    if (p.style === 'shell' && p.shellThick < 2.5 && p.material !== 'tpu') {
+      w.push(`A ${p.material.toUpperCase()} shell ${n1(p.shellThick)} mm thick can crack. Raise heel and arch thickness to 2.5–3.5 mm under Print, or switch the material to TPU.`);
+    }
     return w;
   }
 
@@ -1535,6 +1556,7 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 
       </div>
     </div>
     <div class="bar-actions">
+      <button type="button" class="btn" id="reset"><span id="reset-text">Reset</span><span class="wide"> to defaults</span></button>
       <div class="seg" role="group" aria-label="Which foot">
         <button type="button" id="side-right" data-side="right">Right</button>
         <button type="button" id="side-left" data-side="left">Left</button>
@@ -1557,7 +1579,6 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 
           <button type="button" class="btn" id="save-settings">Save settings</button>
           <label class="btn" for="load-settings">Load settings</label>
           <input type="file" id="load-settings" accept=".json,application/json" hidden>
-          <button type="button" class="btn" id="reset">Reset to defaults</button>
         </div>
         <div class="status" id="status" role="status" aria-live="polite"></div>
       </div>
@@ -2512,7 +2533,7 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 
     const row = el('div', { class: 'sizefill' });
     const sel = el('select', { id: 'size-sys', 'aria-label': 'Size system' },
       '<option value="au-m">AU/UK men\'s</option><option value="au-w">AU/US women\'s</option><option value="us-m">US men\'s</option><option value="eu">EU</option>');
-    const inp = el('input', { id: 'size-num', type: 'number', step: '0.5', value: '9', inputmode: 'decimal' });
+    const inp = el('input', { id: 'size-num', type: 'number', step: '0.5', value: '10', inputmode: 'decimal' });
     const btn = el('button', { type: 'button', class: 'btn', id: 'size-fill' }, 'Fill in');
     row.append(sel, inp, btn);
     wrap.append(row, el('p', { class: 'hint' }, 'Gives typical measurements for that size. Measuring your own foot is more accurate.'));
@@ -2713,7 +2734,25 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 
     }
     ev.target.value = '';
   });
-  document.getElementById('reset').addEventListener('click', () => {
+  // Reset sits next to Download now, so it asks first rather than wiping a design
+  // on a stray click. Two taps, no dialog in the way.
+  const resetBtn = document.getElementById('reset');
+  const resetText = document.getElementById('reset-text');
+  const disarm = () => { resetText.textContent = 'Reset'; resetBtn.classList.remove('armed'); };
+  let resetArmed = 0;
+  resetBtn.addEventListener('click', () => {
+    if (Date.now() - resetArmed > 4000) {
+      resetArmed = Date.now();
+      resetText.textContent = 'Click again to reset';
+      resetBtn.classList.add('armed');
+      App.status('Click reset again to go back to the default settings.');
+      setTimeout(() => {
+        if (Date.now() - resetArmed >= 4000) disarm();
+      }, 4100);
+      return;
+    }
+    resetArmed = 0;
+    disarm();
     App.set(Object.assign({}, G.DEFAULTS, { side: params.side }), { refit: true });
     App.status('Back to the default settings.');
   });

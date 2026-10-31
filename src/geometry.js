@@ -372,15 +372,33 @@
     }
   }
 
+  // Each warning names the setting that tripped it, where that setting lives and
+  // what to do about it. A warning you cannot act on is just noise.
   function warnings(input) {
     const p = sanitize(input), w = [];
+    const n1 = v => v.toFixed(1);
     const ratioW = p.ballWidth / p.length, ratioH = p.heelWidth / p.ballWidth;
-    if (ratioW < 0.32 || ratioW > 0.46) w.push('Ball width is unusual for this foot length. Most feet are 34–42% as wide as they are long — check the measurement.');
-    if (ratioH < 0.55 || ratioH > 0.85) w.push('Heel width is usually 60–80% of the ball width. Measure the heel about 2–3 cm forward from the back.');
-    if (p.archHeight > 22) w.push('Arch heights above about 20 mm feel aggressive for most people. Start lower and go up 2 mm at a time.');
-    if (Math.abs(p.rearPost) > 6 || Math.abs(p.forePost) > 6) w.push('Posts steeper than 6° are uncommon outside a podiatrist\'s prescription.');
-    if (p.metPad > 0 && p.coverage === '3q' && p.metPadPos > 64) w.push('The met pad sits at the very end of a 3/4 shell. Move it back or choose sulcus or full length.');
-    if (p.style === 'shell' && p.shellThick < 2.5 && p.material !== 'tpu') w.push('Rigid shells under 2.5 mm can crack. Use 2.5–3.5 mm for PETG or PLA.');
+    if (ratioW < 0.32 || ratioW > 0.46) {
+      w.push(`Ball width is ${Math.round(ratioW * 100)}% of the foot length, and most feet are 34–42%. Check ball width and foot length under Your foot.`);
+    }
+    if (ratioH < 0.55 || ratioH > 0.85) {
+      w.push(`Heel width is ${Math.round(ratioH * 100)}% of the ball width, and it is usually 60–80%. Re-measure the heel about 2–3 cm forward from the back and set it under Your foot.`);
+    }
+    if (p.archHeight > 22) {
+      w.push(`Arch height is ${n1(p.archHeight)} mm. Above about 20 mm feels aggressive for most people: lower it under Arch and go back up 2 mm at a time.`);
+    }
+    if (Math.abs(p.rearPost) > 6) {
+      w.push(`Rearfoot post is ${n1(p.rearPost)}°, which tilts the heel by about ${n1(Math.abs(Math.tan((p.rearPost * Math.PI) / 180) * p.heelWidth))} mm across. Anything past 6° is uncommon unless a podiatrist measured you for it: set it back under Heel.`);
+    }
+    if (Math.abs(p.forePost) > 6) {
+      w.push(`Forefoot post is ${n1(p.forePost)}°, which tilts the forefoot by about ${n1(Math.abs(Math.tan((p.forePost * Math.PI) / 180) * p.ballWidth))} mm across. Anything past 6° is uncommon unless a podiatrist measured you for it: set it back under Forefoot.`);
+    }
+    if (p.metPad > 0 && p.coverage === '3q' && p.metPadPos > 64) {
+      w.push('The met pad sits at the very end of a 3/4 shell. Move metatarsal pad position back under Forefoot, or switch the orthotic to sulcus or full length under Your foot.');
+    }
+    if (p.style === 'shell' && p.shellThick < 2.5 && p.material !== 'tpu') {
+      w.push(`A ${p.material.toUpperCase()} shell ${n1(p.shellThick)} mm thick can crack. Raise heel and arch thickness to 2.5–3.5 mm under Print, or switch the material to TPU.`);
+    }
     return w;
   }
 
