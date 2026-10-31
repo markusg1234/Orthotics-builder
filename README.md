@@ -1,6 +1,6 @@
 # Orthotics Builder
 
-Design 3D-printable foot orthotics from a tape measure. No 3D scan, no CAD skills, no install: enter three foot measurements, shape the support with sliders, and download an STL ready for your slicer.
+Design 3D-printable foot orthotics from a tape measure. No 3D scan, no CAD skills, no install. Start from your foot's length and widths, or measure an orthotic you already have. Then shape the arch, heel cup, posts and met pad with sliders, and download an STL ready for your slicer.
 
 **Use it:** https://markusg1234.github.io/Orthotics-builder/
 
