@@ -222,6 +222,46 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 
 .check th:first-child, .check td:first-child { text-align: left; }
 .check td:not(:first-child) { font-family: var(--font-mono); }
 
+/* ---------- Measure from a photo ---------- */
+.flowpick { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.flowpick button {
+  display: grid; gap: 1px; padding: 8px 10px; text-align: left; border: 1px solid var(--line);
+  border-radius: 8px; background: var(--bg); color: var(--muted); font: inherit; cursor: pointer;
+}
+.flowpick button:hover { color: var(--ink); }
+.flowpick button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
+.flowpick b { font-weight: 500; font-size: 13px; }
+.flowpick span { font-size: 11.5px; }
+.shot { position: relative; display: block; width: 100%; margin: 0 auto; touch-action: none; }
+.shot img, .shot canvas { display: block; width: 100%; height: auto; border-radius: 6px; background: var(--bg); }
+.shot .guides { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.shot .guides polygon { fill: color-mix(in srgb, var(--accent) 12%, transparent); stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.mark {
+  position: absolute; width: 28px; height: 28px; margin: -14px 0 0 -14px; padding: 0; border-radius: 50%;
+  border: 2px solid var(--accent-ink); background: var(--accent); color: var(--accent-ink);
+  box-shadow: 0 0 0 1px var(--accent), 0 1px 4px rgba(0, 0, 0, .3);
+  font: 600 10px/1 var(--font-mono); display: grid; place-items: center; cursor: grab; touch-action: none;
+}
+.mark.land { background: var(--warn); box-shadow: 0 0 0 1px var(--warn), 0 1px 4px rgba(0, 0, 0, .3); color: var(--warn-bg); }
+/* A thumb needs a bigger target than the dot, and the dot needs to stay small
+   enough to see what is under it. Grow the hit area, not the circle. */
+.mark::before { content: ''; position: absolute; inset: -9px; border-radius: 50%; }
+.mark:active { cursor: grabbing; }
+.mark:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.photo-result { display: grid; gap: 8px; }
+.photo-result:empty { display: none; }
+.readings { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 6px; }
+.reading { border: 1px solid var(--line); border-radius: 8px; background: var(--bg); padding: 6px 8px; display: grid; gap: 1px; }
+.reading b { font: 500 15px/1.2 var(--font-mono); font-variant-numeric: tabular-nums; }
+.reading span { font-size: 11px; color: var(--muted); }
+.plan .traced { fill: none; stroke: var(--warn); stroke-width: 1.2; stroke-dasharray: 4 3; }
+.plan .floor { stroke: var(--ink); stroke-width: 1; }
+.plan .sheet { fill: var(--panel); stroke: var(--line); stroke-width: 1; }
+.plan .cam { fill: none; stroke: var(--muted); stroke-width: 1.1; }
+.plan .lead { stroke: var(--warn); stroke-width: .8; stroke-dasharray: 2 2; fill: none; }
+.plan .bl { fill: var(--warn); }
+.plan .blt { fill: var(--warn-bg); font-size: 9px; font-weight: 600; }
+
 /* ---------- Phone layout ---------- */
 @media (max-width: 860px) {
   html, body { height: auto; }
@@ -255,6 +295,9 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
 /*__GEOMETRY__*/
+</script>
+<script>
+/*__PHOTO__*/
 </script>
 
 <div class="app">
@@ -363,6 +406,47 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 
     ]}
   ];
 
+  /* ---------- Measure from a photo ---------- */
+  // Each way of reading a photo is one entry here, so adding or dropping one is a
+  // single edit and none of them leans on another.
+  const FLOWS = [
+    {
+      id: 'trace', kind: 'top', mode: 'trace', label: 'Foot tracing', sub: 'Length and widths',
+      steps: '<li>Stand on the sheet against a wall with your weight on that foot, and trace around the foot with the pen held upright.</li>' +
+        '<li>Step off, lay the sheet flat, and photograph it from straight above with the sheet filling the frame.</li>',
+      sets: 'Sets foot length, ball width and heel width.'
+    },
+    {
+      id: 'print', kind: 'top', mode: 'print', label: 'Wet footprint', sub: 'Arch type',
+      steps: '<li>Wet the sole of your foot, stand on the sheet for a moment with your weight on it, then step off.</li>' +
+        '<li>Photograph the sheet from straight above while the print is still dark.</li>',
+      sets: 'Suggests an arch height and spread to start from. Standing flattens your arch, and that is the point here: this reads how wide the middle of a loaded foot prints, which is what tells a high arch from a flat one. A print leaves the toes out, so it will not set your foot length.'
+    },
+    {
+      id: 'insole', kind: 'top', mode: 'print', label: 'Insole or orthotic', sub: 'Copy the outline',
+      steps: '<li>Pull the insole out of a shoe that fits you, or pick up the orthotic you already wear.</li>' +
+        '<li>Lay it on the sheet and photograph it from straight above. A dark one on white paper reads best.</li>',
+      sets: 'Matches the outline through the same solver as Copy an existing orthotic. Heights still come from the sliders or a side view.'
+    },
+    {
+      id: 'side', kind: 'side', label: 'Side view', sub: 'Arch height',
+      steps: '<li>Lay a sheet of white paper on the floor on the <b>far</b> side of that foot, so the gap under your arch shows up bright against it.</li>' +
+        '<li>Put the phone on the floor on the near side, about half a metre away, and take the photo square on.</li>',
+      diagram: sideDiagram,
+      sets: 'Sets arch height and peak position, the two settings nothing else here can measure. Nothing to hold or prop up: your own foot length is the ruler, so set that first if it is not already right.'
+    }
+  ];
+
+  const SIDE_MARKS = [
+    { k: 'heel', t: 'H', at: [0.16, 0.78], land: true },
+    { k: 'toe', t: 'T', at: [0.82, 0.80], land: true },
+    { k: 'apex', t: 'A', at: [0.46, 0.64], land: true }
+  ];
+  const TOP_MARKS = [
+    { k: 'c0', t: '1', at: [0.1, 0.1] }, { k: 'c1', t: '2', at: [0.9, 0.1] },
+    { k: 'c2', t: '3', at: [0.9, 0.9] }, { k: 'c3', t: '4', at: [0.1, 0.9] }
+  ];
+
   let params = Object.assign({}, G.DEFAULTS);
   try {
     const saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
@@ -385,6 +469,29 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 
   const fmt = (v, step) => (step < 1 ? Number(v).toFixed(step < 0.5 ? 1 : 1) : String(Math.round(v)));
   const host = document.getElementById('sections');
   const ranges = {}, nums = {}, choices = {};
+
+  // Snap a measured value onto what its control can actually represent. A photo or
+  // the orthotic solver lands between steps, which is finer than these measurements
+  // deserve and marks the number box invalid until the slider is next touched.
+  function toStep(patch) {
+    const out = {};
+    for (const k in patch) {
+      const r = ranges[k];
+      out[k] = r && typeof patch[k] === 'number'
+        ? Number((Math.round(patch[k] / r._step) * r._step).toFixed(3))
+        : patch[k];
+    }
+    return out;
+  }
+
+  // The outline read off a photo, drawn over the generated one in the measuring
+  // guide. Declared up here because buildGuide runs while the sections are built.
+  let photoOutline = null;
+  let planNote = null;
+  function setPhotoOutline(poly) {
+    photoOutline = poly && poly.length > 2 ? poly : null;
+    drawPlan();
+  }
 
   function el(tag, attrs, html) {
     const e = document.createElement(tag);
@@ -422,19 +529,12 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 
     host.append(d);
   }
   host.prepend(buildCopy());
+  host.prepend(buildPhoto());
 
   /* ---------- Copy an existing orthotic ---------- */
-  function spanAt(pts, xs) {
-    let lo = Infinity, hi = -Infinity;
-    for (let i = 0; i < pts.length; i++) {
-      const [x1, y1] = pts[i], [x2, y2] = pts[(i + 1) % pts.length];
-      if ((x1 - xs) * (x2 - xs) <= 0 && x1 !== x2) {
-        const y = y1 + ((y2 - y1) * (xs - x1)) / (x2 - x1);
-        lo = Math.min(lo, y); hi = Math.max(hi, y);
-      }
-    }
-    return [lo, hi];
-  }
+  // Width of a closed polyline at a station. Declared, not assigned, because the
+  // sections are built before this point in the file is reached.
+  function spanAt(pts, xs) { return window.OrthoPhoto.spanAt(pts, xs); }
   function badge(x, y, n) {
     return `<circle cx="${x}" cy="${y}" r="7.5" class="b"/><text x="${x}" y="${y + 3.2}" class="bt" text-anchor="middle">${n}</text>`;
   }
@@ -598,7 +698,7 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 
       const meas = read();
       const r = G.fromOrthotic(meas, params);
       if (r.error) { result.innerHTML = ''; result.append(el('div', { class: 'alert' }, r.error)); return; }
-      App.set(r.params, { refit: true });
+      App.set(toStep(r.params), { refit: true });
       const p = params, md = G.measureDesign(p);
       const v = k => (meas[k] === '' || meas[k] == null ? null : Number(meas[k]));
       const rows = [
@@ -620,6 +720,553 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 
       for (const n of r.notes) result.append(el('div', { class: 'alert' }, n));
       App.status('Matched your orthotic. Fine-tune it with the sliders below.');
     });
+    return d;
+  }
+
+  function landmark(x, y, t) {
+    return `<circle cx="${x}" cy="${y}" r="7.5" class="bl"/><text x="${x}" y="${y + 3.2}" class="blt" text-anchor="middle">${t}</text>`;
+  }
+
+  // Setting up the side photo. The plan view is the real outline out of the
+  // geometry engine; the profile beside it is drawn by hand, because the engine
+  // models orthotics and not feet.
+  function sideDiagram() {
+    const P = Object.assign({}, G.DEFAULTS, { side: 'right', coverage: 'full' });
+    const o = G.build(P).outline, L = P.length;
+
+    /* ---- From above: where the phone goes ---- */
+    const s = 0.72, x0 = 50;
+    let lo = Infinity, hi = -Infinity;
+    for (const [, y] of o) { lo = Math.min(lo, y); hi = Math.max(hi, y); }
+    const cy = 76 + hi * s;                       // medial edge lands at y = 76
+    const TX = x => x0 + x * s, TY = y => cy - y * s;
+    const foot = o.map(([x, y], i) => (i ? 'L' : 'M') + TX(x).toFixed(1) + ' ' + TY(y).toFixed(1)).join(' ') + 'Z';
+    const camX = TX(0.45 * L), camY = 26;
+    const plan = [
+      `<svg class="plan diag" viewBox="0 0 360 ${(TY(lo) + 30).toFixed(0)}" role="img" aria-label="From above: a right foot with a sheet of paper on the floor beyond its far side, and the phone on the floor on the near side, square on, about half a metre away">`,
+      // the sheet goes beyond the foot, so the gap under the arch reads against it
+      `<rect class="sheet" x="${TX(-0.08 * L).toFixed(1)}" y="${(TY(lo) + 3).toFixed(1)}" width="${(1.16 * L * s).toFixed(1)}" height="22"/>`,
+      `<text x="${TX(0.5 * L)}" y="${(TY(lo) + 18).toFixed(1)}" text-anchor="middle">paper, on the far side</text>`,
+      `<path class="outline" d="${foot}"/>`,
+      // the phone, lying on the floor looking across at the inside of the foot
+      `<rect class="cam" x="${camX - 9}" y="${camY - 15}" width="18" height="30" rx="3"/>`,
+      `<circle class="cam" cx="${camX}" cy="${camY + 9}" r="3.2"/>`,
+      `<line class="ext" x1="${camX}" y1="${camY + 17}" x2="${camX}" y2="${TY(hi) - 2}"/>`,
+      `<path class="dim" d="M${camX + 8} ${TY(hi) - 2} L${camX + 8} ${TY(hi) - 10} L${camX} ${TY(hi) - 10}"/>`,
+      `<text x="${camX + 16}" y="${camY - 6}">phone, flat on the floor</text>`,
+      `<text x="${camX + 14}" y="${TY(hi) - 14}">square on</text>`,
+      `<text x="${camX - 14}" y="${(camY + TY(hi)) / 2}" text-anchor="end">about 50 cm</text>`,
+      `<text x="${TX(L) + 6}" y="${TY(0) - 2}">toes</text>`,
+      '</svg>'
+    ].join('');
+
+    /* ---- From the inside: what the camera should see ---- */
+    // Drawn in millimetres at one unit each, so the arch really is the fraction of
+    // the foot that it is: a 265 mm foot with a 22 mm arch, to the same scale.
+    const fl = 100, FX = mm => 30 + mm, FY = h => fl - h;
+    const P2 = (mm, h) => FX(mm).toFixed(1) + ' ' + FY(h).toFixed(1);
+    const profile = [
+      `M${P2(0, 0)} L${P2(0, 32)}`,                                   // up the back of the heel
+      `C${P2(0, 46)} ${P2(14, 56)} ${P2(38, 62)}`,                    // round into the achilles
+      `C${P2(36, 72)} ${P2(35, 80)} ${P2(35, 88)}`,                   // the leg, cut off at the top
+      `L${P2(83, 88)}`,
+      `C${P2(81, 74)} ${P2(82, 64)} ${P2(90, 56)}`,                   // down the shin to the instep
+      `C${P2(118, 52)} ${P2(150, 45)} ${P2(200, 34)}`,                // the dorsum, out to the toes
+      `C${P2(224, 29)} ${P2(246, 23)} ${P2(263, 17)}`,
+      `C${P2(266, 8)} ${P2(266, 2)} ${P2(259, 0)} L${P2(165, 0)}`,    // round the toe, forefoot on the floor
+      `C${P2(141, 1)} ${P2(123, 22)} ${P2(110, 22)}`,                 // up into the arch
+      `C${P2(97, 22)} ${P2(73, 1)} ${P2(55, 0)} Z`                    // and down to the heel
+    ].join(' ');
+    const ax = FX(110), ay = FY(22);                                  // the top of the arch
+    const side = [
+      `<svg class="plan diag" viewBox="0 0 360 136" role="img" aria-label="From the inside of the foot: the three points to mark, at the back of the heel, the tip of the toe and the top of the arch, with the arch height measured up from the floor and the foot length along it">`,
+      `<line class="floor" x1="12" y1="${fl}" x2="348" y2="${fl}"/>`,
+      `<text x="348" y="${fl - 5}" text-anchor="end">floor</text>`,
+      `<path class="outline" d="${profile}"/>`,
+      // what the three marks between them measure
+      `<line class="dim" x1="${ax}" y1="${ay}" x2="${ax}" y2="${fl}"/>`,
+      `<text x="${ax}" y="${ay - 13}" text-anchor="middle">arch height</text>`,
+      `<line class="dim" x1="${FX(0)}" y1="120" x2="${FX(259)}" y2="120"/>`,
+      `<line class="ext" x1="${FX(0)}" y1="114" x2="${FX(0)}" y2="126"/>`,
+      `<line class="ext" x1="${FX(259)}" y1="114" x2="${FX(259)}" y2="126"/>`,
+      `<text x="${FX(130)}" y="133" text-anchor="middle">your foot length is the ruler for both</text>`,
+      landmark(ax, ay, 'A'),
+      landmark(FX(0), fl, 'H'),
+      landmark(FX(259), fl, 'T'),
+      '</svg>'
+    ].join('');
+    return plan + side;
+  }
+
+  function buildPhoto() {
+    const Ph = window.OrthoPhoto;
+    const UI_KEY = 'orthotics-builder.photo.ui.v1';
+    const state = { flow: FLOWS[0], sheet: 'a4', stance: 'standing', fill: Ph.DEFAULT_FILL, coverage: 'full' };
+    try {
+      const d = JSON.parse(localStorage.getItem(UI_KEY) || '{}') || {};
+      const f = FLOWS.find(x => x.id === d.flow);
+      if (f) state.flow = f;
+      if (Ph.SHEETS[d.sheet]) state.sheet = d.sheet;
+      if (d.stance === 'standing' || d.stance === 'sitting') state.stance = d.stance;
+      if (d.fill >= 60 && d.fill <= 130) state.fill = d.fill;
+      if (G.COVERAGE_END[d.coverage]) state.coverage = d.coverage;
+    } catch (e) { /* storage unavailable */ }
+    const saveUI = () => {
+      try {
+        localStorage.setItem(UI_KEY, JSON.stringify({ flow: state.flow.id, sheet: state.sheet, stance: state.stance, fill: state.fill, coverage: state.coverage }));
+      } catch (e) { /* ignore */ }
+    };
+
+    // The photo being worked on. Marks are stored as fractions of the image, so
+    // the preview can be any size on screen and the maths stays in pixels.
+    let shot = null, drag = null, lastSide = null;
+
+    const d = el('details', { class: 'sec', id: 'sec-photo' });
+    const s = el('summary');
+    s.append(el('span', { class: 'sec-title' }, 'Measure from a photo'), el('span', { class: 'sec-sub' }, 'Phone and paper'));
+    d.append(s);
+    const body = el('div', { class: 'sec-body' });
+    body.append(el('p', { class: 'hint' }, 'Photograph a sheet of paper and the page reads the measurements off it. The sheet is a known size, so its four corners cancel out the angle you held the camera at.'));
+
+    const pick = el('div', { class: 'flowpick', role: 'group', 'aria-label': 'What the photo shows' });
+    const flowBtns = {};
+    for (const f of FLOWS) {
+      const b = flowBtns[f.id] = el('button', { type: 'button', id: 'ph-flow-' + f.id }, `<b>${f.label}</b><span>${f.sub}</span>`);
+      b.addEventListener('click', () => {
+        if (state.flow === f) return;
+        state.flow = f;
+        saveUI();
+        resetMarks();
+        clearResult();
+        paintFlow();
+        if (shot && f.kind === 'top') autoFind();
+        placeMarks();
+      });
+      pick.append(b);
+    }
+    body.append(pick);
+
+    const steps = el('ol', { class: 'steps' });
+    const diag = el('div', { class: 'diagram' });
+    const sets = el('p', { class: 'hint' });
+    body.append(steps, diag, sets);
+
+    const sheetRow = el('div', { class: 'field' });
+    sheetRow.append(el('label', { for: 'ph-sheet' }, '<span style="font-weight:500">Paper size</span>'));
+    const sheetSel = el('select', { id: 'ph-sheet', class: 'ph-sheet', 'aria-label': 'Paper size' },
+      Object.keys(Ph.SHEETS).map(k => `<option value="${k}">${Ph.SHEETS[k].label} — ${Ph.SHEETS[k].detail}</option>`).join(''));
+    sheetSel.value = state.sheet;
+    const sheetWrap = el('div', { class: 'sizefill' });
+    sheetWrap.append(sheetSel);
+    sheetRow.append(sheetWrap, el('p', { class: 'hint' }, 'A4 holds a foot up to about 290 mm. Longer than that and the tracing will not fit, so tape two A4 sheets together along their long edges and mark the corners of the whole rectangle.'));
+    sheetSel.addEventListener('change', () => {
+      state.sheet = sheetSel.value;
+      saveUI();
+      clearResult();
+      if (shot) { autoFind(); placeMarks(); }
+    });
+    body.append(sheetRow);
+
+    // How far the thing in the photo reaches, which is not the same question as how
+    // long you want the orthotic: the solver works back from one to the other.
+    const covRow = el('div', { class: 'choice' });
+    covRow.append(el('span', { class: 'field-head' }, '<span style="font-weight:500">Where does it end?</span>'));
+    const covSeg = el('div', { class: 'seg', role: 'group', 'aria-label': 'Where the insole or orthotic ends' });
+    const paintCov = () => covSeg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === state.coverage ? 'true' : 'false'));
+    for (const [v, t] of [['full', 'Full length'], ['sulcus', 'Toe crease'], ['3q', 'Behind the ball']]) {
+      const b = el('button', { type: 'button', id: 'ph-cov-' + v, 'data-v': v }, t);
+      b.addEventListener('click', () => { state.coverage = v; paintCov(); saveUI(); clearResult(); });
+      covSeg.append(b);
+    }
+    paintCov();
+    covRow.append(covSeg, el('p', { class: 'hint' }, 'An insole pulled out of a shoe is almost always full length. Orthotics often stop behind the ball of the foot.'));
+    body.append(covRow);
+
+    // Standing or sitting changes what the measurement means, so it has to be asked
+    // rather than assumed: the same number is nearly all of the arch to build in one
+    // position and about two thirds of it in the other.
+    const stanceRow = el('div', { class: 'choice' });
+    stanceRow.append(el('span', { class: 'field-head' }, '<span style="font-weight:500">Weight on that foot?</span>'));
+    const stanceSeg = el('div', { class: 'seg', role: 'group', 'aria-label': 'Whether you are standing on that foot' });
+    const stanceHint = el('p', { class: 'hint' });
+    const paintStance = () => {
+      stanceSeg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === state.stance ? 'true' : 'false'));
+      stanceHint.innerHTML = state.stance === 'standing'
+        ? 'Standing, the gap under your arch is at its smallest, but for most feet it is still there &mdash; that gap is exactly what a wet footprint leaves a narrow waist in. It is smaller and so harder to see, which is what the paper behind your foot is for, but it is the arch you need, measured rather than estimated.'
+        : `Sitting, the arch springs up and the gap is easy to see, but it is not an arch you ever stand on. About ${Ph.ARCH_DROP} mm comes off before building, and that is a figure for people in general, not for you. Worth using when you cannot make out the gap standing; otherwise standing is the more accurate of the two.`;
+    };
+    for (const [v, t] of [['standing', 'Standing on it'], ['sitting', 'Sitting, no weight']]) {
+      const b = el('button', { type: 'button', id: 'ph-stance-' + v, 'data-v': v }, t);
+      b.addEventListener('click', () => {
+        if (state.stance === v) return;
+        state.stance = v;
+        paintStance();
+        saveUI();
+        clearResult();
+      });
+      stanceSeg.append(b);
+    }
+    paintStance();
+    stanceRow.append(stanceSeg, stanceHint);
+    body.append(stanceRow);
+
+    const fileRow = el('div', { class: 'file-row' });
+    // No capture attribute: on a phone that would force the camera and rule out a
+    // photo already taken. The picker offers the camera either way.
+    const file = el('input', { type: 'file', id: 'ph-file', accept: 'image/*', hidden: '' });
+    const fileBtn = el('label', { class: 'btn', for: 'ph-file' }, 'Choose a photo');
+    fileRow.append(fileBtn, file);
+    body.append(fileRow);
+
+    const shotHost = el('div', { class: 'shot' });
+    const shotImg = el('img', { alt: 'The photo you chose, with draggable markers on it' });
+    const guides = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    guides.setAttribute('class', 'guides');
+    guides.setAttribute('preserveAspectRatio', 'none');
+    guides.setAttribute('viewBox', '0 0 100 100');
+    guides.setAttribute('aria-hidden', 'true');
+    const guidePoly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    guides.append(guidePoly);
+    shotHost.append(shotImg, guides);
+    const markHint = el('p', { class: 'hint' });
+    body.append(shotHost, markHint);
+
+    const actions = el('div', { class: 'file-row' });
+    const readBtn = el('button', { type: 'button', class: 'btn primary', id: 'ph-read' }, 'Read the photo');
+    const againBtn = el('button', { type: 'button', class: 'btn', id: 'ph-again' }, 'Find the sheet again');
+    actions.append(readBtn, againBtn);
+    const result = el('div', { class: 'photo-result', id: 'ph-result', 'aria-live': 'polite' });
+    body.append(actions, result);
+    d.append(body);
+
+    /* ---- markers ---- */
+
+    const marks = {};        // key -> button element
+    function markDefs() { return state.flow.kind === 'side' ? SIDE_MARKS : TOP_MARKS; }
+
+    function resetMarks() {
+      if (!shot) return;
+      shot.marks = {};
+      for (const m of markDefs()) shot.marks[m.k] = m.at.slice();
+      shot.found = false;
+    }
+
+    function buildMarks() {
+      for (const k in marks) { marks[k].remove(); delete marks[k]; }
+      for (const m of markDefs()) {
+        const b = el('button', {
+          type: 'button', class: 'mark' + (m.land ? ' land' : ''), 'data-k': m.k,
+          'aria-label': 'Marker ' + m.t + (m.land ? '' : ', corner of the sheet') + '. Drag it, or nudge it with the arrow keys.'
+        }, m.t);
+        b.addEventListener('pointerdown', e => {
+          // Capture keeps the drag alive when the pointer leaves the marker. If the
+          // pointer has already gone it throws, and the drag is still fine without it.
+          try { b.setPointerCapture(e.pointerId); } catch (err) { /* carry on uncaptured */ }
+          drag = { k: m.k, id: e.pointerId };
+          e.preventDefault();
+        });
+        b.addEventListener('pointermove', e => {
+          if (!drag || drag.id !== e.pointerId || !shot) return;
+          const r = shotHost.getBoundingClientRect();
+          if (!r.width || !r.height) return;
+          shot.marks[drag.k] = [
+            Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)),
+            Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))
+          ];
+          placeMarks();
+        });
+        b.addEventListener('pointerup', () => { drag = null; });
+        b.addEventListener('pointercancel', () => { drag = null; });
+        b.addEventListener('keydown', e => {
+          const step = e.shiftKey ? 0.01 : 0.002;
+          const d2 = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
+          if (!d2 || !shot) return;
+          e.preventDefault();
+          const p = shot.marks[m.k];
+          shot.marks[m.k] = [Math.min(1, Math.max(0, p[0] + d2[0])), Math.min(1, Math.max(0, p[1] + d2[1]))];
+          placeMarks();
+        });
+        marks[m.k] = b;
+        shotHost.append(b);
+      }
+    }
+
+    function placeMarks() {
+      const on = !!shot;
+      shotHost.style.display = on ? '' : 'none';
+      markHint.style.display = on ? '' : 'none';
+      actions.style.display = on ? '' : 'none';
+      againBtn.style.display = on && state.flow.kind === 'top' ? '' : 'none';
+      if (!on) return;
+      for (const m of markDefs()) {
+        const p = shot.marks[m.k], b = marks[m.k];
+        if (!p || !b) continue;
+        b.style.left = (p[0] * 100).toFixed(3) + '%';
+        b.style.top = (p[1] * 100).toFixed(3) + '%';
+      }
+      const q = ['c0', 'c1', 'c2', 'c3'].map(k => shot.marks[k]).filter(Boolean);
+      guidePoly.setAttribute('points', q.map(p => (p[0] * 100).toFixed(2) + ',' + (p[1] * 100).toFixed(2)).join(' '));
+      if (state.flow.kind === 'side') {
+        markHint.innerHTML = 'Put <b>H</b> on the back of your heel and <b>T</b> on the tip of your longest toe, both right down where they meet the floor, then <b>A</b> on the highest point of the arch underneath. Arrow keys nudge, Shift speeds them up.';
+      } else if (shot.found) {
+        markHint.innerHTML = 'Found the sheet. Check <b>1–4</b> really are on its corners and drag any that are off. Arrow keys nudge, Shift speeds them up.';
+      } else {
+        markHint.innerHTML = 'Could not pick the sheet out of this photo, so drag <b>1–4</b> onto its four corners yourself. Arrow keys nudge, Shift speeds them up.';
+      }
+    }
+
+    function paintFlow() {
+      for (const f of FLOWS) flowBtns[f.id].setAttribute('aria-pressed', f === state.flow ? 'true' : 'false');
+      steps.innerHTML = state.flow.steps;
+      diag.innerHTML = state.flow.diagram ? state.flow.diagram() : '';
+      diag.style.display = state.flow.diagram ? '' : 'none';
+      sets.textContent = state.flow.sets;
+      sheetRow.style.display = state.flow.kind === 'top' ? '' : 'none';
+      covRow.style.display = state.flow.id === 'insole' ? '' : 'none';
+      stanceRow.style.display = state.flow.kind === 'side' ? '' : 'none';
+      buildMarks();
+    }
+
+    /* ---- loading ---- */
+
+    function clearResult() { result.innerHTML = ''; lastSide = null; }
+    function fail(msg) {
+      clearResult();
+      result.append(el('div', { class: 'alert' }, msg));
+    }
+
+    file.addEventListener('change', () => {
+      const f = file.files && file.files[0];
+      file.value = '';
+      if (f) loadFile(f);
+    });
+
+    function loadFile(f) {
+      const url = URL.createObjectURL(f);
+      const im = new Image();
+      im.onload = () => {
+        // Cap the working resolution: beyond this the extra pixels cost time and
+        // buy nothing, because the corners are what limit the accuracy.
+        const cap = 1600, sc = Math.min(1, cap / Math.max(im.naturalWidth, im.naturalHeight));
+        const w = Math.max(1, Math.round(im.naturalWidth * sc)), h = Math.max(1, Math.round(im.naturalHeight * sc));
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const ctx = c.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(im, 0, 0, w, h);
+        let data = null;
+        try { data = ctx.getImageData(0, 0, w, h).data; } catch (e) { data = null; }
+        if (!data) { URL.revokeObjectURL(url); fail('The browser would not let the page read that image.'); return; }
+        if (shot && shot.url) URL.revokeObjectURL(shot.url);
+        shot = { url, px: { width: w, height: h, data }, marks: {}, found: false };
+        shotImg.src = url;
+        resetMarks();
+        clearResult();
+        if (state.flow.kind === 'top') autoFind();
+        placeMarks();
+        App.status(shot.found ? 'Photo loaded and the sheet found. Check the corner markers.' : 'Photo loaded. Drag the markers into place.');
+      };
+      im.onerror = () => { URL.revokeObjectURL(url); fail('That file did not load as an image.'); };
+      im.src = url;
+    }
+
+    function autoFind() {
+      if (!shot) return;
+      const q = Ph.findQuad(shot.px, Ph.SHEETS[state.sheet]);
+      shot.found = !!q;
+      if (!q) return;
+      ['c0', 'c1', 'c2', 'c3'].forEach((k, i) => {
+        shot.marks[k] = [q[i][0] / shot.px.width, q[i][1] / shot.px.height];
+      });
+    }
+
+    againBtn.addEventListener('click', () => {
+      if (!shot) return;
+      autoFind();
+      placeMarks();
+      App.status(shot.found ? 'Found the sheet again.' : 'Still could not find the sheet in this photo.');
+    });
+
+    /* ---- reading ---- */
+
+    readBtn.addEventListener('click', () => {
+      if (!shot) { fail('Choose a photo first.'); return; }
+      const toPx = k => [shot.marks[k][0] * shot.px.width, shot.marks[k][1] * shot.px.height];
+      if (state.flow.kind === 'side') { readSide(toPx); return; }
+      const corners = ['c0', 'c1', 'c2', 'c3'].map(toPx);
+      if (!Ph.isConvexQuad(corners)) {
+        fail('Markers 1 to 4 cross over each other. Put them on the four corners in order, going round the shape.');
+        return;
+      }
+      const sheet = Ph.SHEETS[state.sheet];
+      const rect = Ph.rectify(shot.px, Ph.orderQuad(corners, sheet.w, sheet.h), sheet.w, sheet.h, 4);
+      if (!rect) { fail('Could not work out the angle from those four corners. Check they are on the sheet.'); return; }
+      const out = Ph.extractOutline(rect, state.flow.mode);
+      if (out.error) { fail(out.error); return; }
+      const m = Ph.measureOutline(out.poly);
+      if (m.error) { fail(m.error); return; }
+      showTop(rect, out, m);
+    });
+
+    function reading(value, unit, label, extra) {
+      return el('div', { class: 'reading' + (extra ? ' ' + extra : '') }, `<b>${value}<span>${unit ? ' ' + unit : ''}</span></b><span>${label}</span>`);
+    }
+
+    function showTop(rect, out, m) {
+      clearResult();
+      const f1 = x => x.toFixed(1);
+      result.append(el('p', { class: 'hint' }, 'The sheet flattened out, with the outline the page found drawn on it. If that outline is not your foot, fix the corner markers and read it again.'));
+      const host = el('div', { class: 'shot' });
+      host.append(rectCanvas(rect, out.poly));
+      result.append(host);
+
+      const rows = el('div', { class: 'readings' });
+      if (state.flow.id === 'print') {
+        const a = Ph.archFromPrint(m.csi);
+        rows.append(reading(f1(m.midWidth != null ? m.midWidth : 0), 'mm', 'narrowest middle'));
+        rows.append(reading(f1(m.maxWidth), 'mm', 'widest part'));
+        rows.append(reading(m.csi != null ? m.csi.toFixed(2) : '—', '', 'middle ÷ widest'));
+        if (a) rows.append(reading(a.type, '', 'arch reads as'));
+        result.append(rows);
+        if (!a) { result.append(el('div', { class: 'alert' }, 'Could not read a midfoot width from that print.')); return; }
+        result.append(el('p', { class: 'hint' }, `That ratio puts you in ${a.say}. Published cut-offs for this scatter a lot and most of the research is in children, so treat it as somewhere to start rather than a finding: wear it a few days and go up or down 2 mm at a time.`));
+        addApply(`Use this: arch ${a.archHeight} mm, spread ${a.archSpread}%`, () => {
+          App.set(toStep({ archHeight: a.archHeight, archSpread: a.archSpread }), { refit: true });
+          setPhotoOutline(m.poly);
+          return `Starting arch set to ${a.archHeight} mm from your footprint.`;
+        });
+        return;
+      }
+
+      rows.append(reading(f1(m.length), 'mm', state.flow.id === 'insole' ? 'overall length' : 'foot length'));
+      rows.append(reading(f1(m.maxWidth), 'mm', state.flow.id === 'insole' ? 'widest width' : 'ball width'));
+      rows.append(reading(f1(m.heelWidth), 'mm', 'heel width'));
+      result.append(rows);
+
+      if (state.flow.id === 'insole') {
+        result.append(el('p', { class: 'hint' }, 'This goes through the same solver as Copy an existing orthotic: it works back from the outline to a foot that would fit it. Heights are not in a photo from above, so set those with the sliders or read a side view.'));
+        addApply('Match this outline', () => {
+          const r = G.fromOrthotic({
+            coverage: state.coverage, style: params.style,
+            length: m.length, maxWidth: m.maxWidth, heelWidth: m.heelWidth
+          }, params);
+          if (r.error) return r.error;
+          App.set(toStep(r.params), { refit: true });
+          setPhotoOutline(m.poly);
+          for (const n of r.notes) result.append(el('div', { class: 'alert' }, n));
+          return 'Matched the outline from your photo.';
+        });
+        return;
+      }
+
+      result.append(el('p', { class: 'hint' }, 'Measured the way the instructions below say to measure by hand: length heel to longest toe, widest point across the ball, and the heel 25 mm in from the back.'));
+      addApply('Use these measurements', () => {
+        App.set(toStep({ length: m.length, ballWidth: m.maxWidth, heelWidth: m.heelWidth }), { refit: true });
+        setPhotoOutline(m.poly);
+        return 'Set your foot measurements from the tracing. The dashed outline in the guide below is the one from your photo.';
+      });
+    }
+
+    function readSide(toPx) {
+      const marksIn = { heel: toPx('heel'), toe: toPx('toe'), apex: toPx('apex') };
+      const go = fill => Ph.archFromSide(marksIn, { footLength: params.length, stance: state.stance, fill: fill / 100 });
+      const r = go(state.fill);
+      if (r.error) { fail(r.error); return; }
+      showSide(r, go);
+    }
+
+    function showSide(r, go) {
+      clearResult();
+      // After clearing, not before: clearing drops the stored reading, and the fill
+      // slider below needs it to re-run without going back to the photo.
+      lastSide = go;
+      const f1 = x => x.toFixed(1);
+      const rows = el('div', { class: 'readings' });
+      const sitting = r.stance === 'sitting';
+      rows.append(reading(f1(r.clearHeight), 'mm', sitting ? 'arch, sitting' : 'arch above the floor'));
+      if (sitting) rows.append(reading(f1(r.loadedHeight), 'mm', 'arch once you stand'));
+      rows.append(reading(Math.round(r.archPeak), '%', 'peak along the foot'));
+      rows.append(reading(f1(r.archHeight), 'mm', 'arch to build', 'built'));
+      rows.append(reading(Math.round(r.footLength), 'mm', 'scaled from foot length'));
+      result.append(rows);
+      // The slider sits on the arch you stand on, so say plainly what that is.
+      result.append(el('p', { class: 'hint' }, sitting
+        ? `You measured sitting, so ${f1(r.clearHeight)} mm is an arch with no load on it. It settles about ${Ph.ARCH_DROP} mm the moment you stand, leaving ${f1(r.loadedHeight)} mm to support, and that is what the percentage below works from. Building the full sitting height instead would lift your arch rather than meet it.`
+        : `You measured standing, so ${f1(r.clearHeight)} mm is the arch you have to support: it is already pressed down as far as it goes. Building all of it puts the orthotic against your arch along its whole length.`));
+      if (r.loadedHeight < 4) {
+        result.append(el('div', { class: 'alert' }, sitting
+          ? 'That leaves almost no arch once the drop comes off. Check the three markers. If it is right, a foot this flat wants a low, broad support rather than a tall one, so widen the arch spread instead of raising the arch.'
+          : 'Almost no gap under your arch standing. If you could not really make out the gap in the photo, try it again sitting instead. If the arch genuinely does flatten onto the floor, that is a flat foot under load, and it wants a low, broad support rather than a tall one: widen the arch spread instead of raising the arch.'));
+      }
+      result.append(el('p', { class: 'hint' }, 'Photographs read arch height a little high compared with calipers, so treat a first fit as a starting point and go up 2 mm at a time.'));
+
+      const wrap = el('div', { class: 'field' });
+      const head = el('div', { class: 'field-head' });
+      head.append(el('label', { for: 'ph-fill' }, 'How much of it to build'));
+      const num = el('span', { class: 'num' }, `${state.fill}<span>%</span>`);
+      head.append(num);
+      const sl = el('input', { type: 'range', id: 'ph-fill', min: '60', max: '130', step: '5' });
+      sl.value = state.fill;
+      sl.style.setProperty('--fill', ((state.fill - 60) / 70 * 100).toFixed(1) + '%');
+      wrap.append(head, sl, el('p', { class: 'hint' }, '100% meets your arch along its whole length when you stand on it, which is what supporting the arch means. Lower leaves a gap in quiet standing that closes again as the foot flattens in walking, which is a gentler way to break a first orthotic in. Higher lifts the arch above where it stands.'));
+      result.append(wrap);
+      sl.addEventListener('input', () => {
+        state.fill = Number(sl.value);
+        saveUI();
+        sl.style.setProperty('--fill', ((state.fill - 60) / 70 * 100).toFixed(1) + '%');
+        num.innerHTML = `${state.fill}<span>%</span>`;
+        if (!lastSide) return;
+        const next = lastSide(state.fill);
+        if (next.error) return;
+        const cell = result.querySelector('.reading.built b');
+        if (cell) cell.innerHTML = `${f1(next.archHeight)}<span> mm</span>`;
+      });
+
+      addApply('Use this arch', () => {
+        const cur = lastSide ? lastSide(state.fill) : r;
+        if (cur.error) return cur.error;
+        App.set(toStep({ archHeight: cur.archHeight, archPeak: cur.archPeak }), { refit: true });
+        return `Arch set to ${f1(params.archHeight)} mm at ${Math.round(params.archPeak)}% along the foot, from ${f1(cur.clearHeight)} mm of clear arch height.`;
+      });
+    }
+
+    function addApply(label, run) {
+      const row = el('div', { class: 'file-row' });
+      const b = el('button', { type: 'button', class: 'btn primary' }, label);
+      b.addEventListener('click', () => {
+        const msg = run();
+        if (msg) App.status(msg);
+      });
+      row.append(b);
+      result.append(row);
+    }
+
+    // The rectified sheet, in grey, with the outline that was found drawn over it.
+    function rectCanvas(rect, poly) {
+      const c = el('canvas');
+      c.width = rect.width; c.height = rect.height;
+      const ctx = c.getContext('2d');
+      const im = ctx.createImageData(rect.width, rect.height);
+      for (let i = 0, n = rect.width * rect.height; i < n; i++) {
+        const v = rect.data[i], j = i * 4;
+        im.data[j] = v; im.data[j + 1] = v; im.data[j + 2] = v; im.data[j + 3] = 255;
+      }
+      ctx.putImageData(im, 0, 0);
+      if (poly && poly.length) {
+        ctx.beginPath();
+        for (let i = 0; i < poly.length; i++) {
+          const x = poly[i][0] * rect.pxPerMm, y = poly[i][1] * rect.pxPerMm;
+          if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+        }
+        ctx.closePath();
+        ctx.lineWidth = Math.max(2, rect.pxPerMm);
+        ctx.strokeStyle = '#E0613A';
+        ctx.stroke();
+      }
+      return c;
+    }
+
+    paintFlow();
+    placeMarks();
     return d;
   }
 
@@ -669,7 +1316,8 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 
       '<li><b>Heel width:</b> widest point of the heel, 2–3 cm in from the back.</li>' +
       '<li>Measure both feet and use each foot\'s own numbers. They often differ by a few millimetres.</li>'));
     const svg = el('div', { id: 'plan-host' });
-    body.append(svg, el('p', { class: 'hint' }, 'Outline generated from your numbers, shown full length. Compare it with your tracing.'));
+    planNote = el('p', { class: 'hint' }, 'Outline generated from your numbers, shown full length. Compare it with your tracing.');
+    body.append(svg, planNote);
     d.append(body);
     d.addEventListener('toggle', drawPlan);
     return d;
@@ -685,38 +1333,46 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 
     const pts = m.outline;
     let minY = Infinity, maxY = -Infinity;
     for (const [, y] of pts) { minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
-    // SVG: toes up. svgX = -y (so the right foot's big toe is on the left), svgY = L - x
-    const pad = 34, w = (maxY - minY) + pad * 2 + 30, h = L + pad * 2;
-    const X = y => (maxY - y) + pad, Y = x => (L - x) + pad;
-    const path = pts.map(([x, y], i) => (i ? 'L' : 'M') + X(y).toFixed(1) + ' ' + Y(x).toFixed(1)).join(' ') + 'Z';
-    // width at a station (from the outline)
-    function across(xs) {
-      let lo = Infinity, hi = -Infinity;
-      for (let i = 0; i < pts.length; i++) {
-        const [x1, y1] = pts[i], [x2, y2] = pts[(i + 1) % pts.length];
-        if ((x1 - xs) * (x2 - xs) <= 0 && x1 !== x2) {
-          const y = y1 + (y2 - y1) * (xs - x1) / (x2 - x1);
-          lo = Math.min(lo, y); hi = Math.max(hi, y);
-        }
-      }
-      return [lo, hi];
+    // A photo outline arrives medial-side positive, like a right foot, so mirror it
+    // for a left one and sit it on the generated outline's centre line.
+    let traced = null, top = L;
+    if (photoOutline) {
+      const flip = side === 'left' ? -1 : 1;
+      let tlo = Infinity, thi = -Infinity;
+      for (const [, y] of photoOutline) { const v = y * flip; tlo = Math.min(tlo, v); thi = Math.max(thi, v); }
+      const dy = (minY + maxY) / 2 - (tlo + thi) / 2;
+      traced = photoOutline.map(([x, y]) => [x, y * flip + dy]);
+      for (const [x, y] of traced) { minY = Math.min(minY, y); maxY = Math.max(maxY, y); top = Math.max(top, x); }
     }
+    // SVG: toes up. svgX = -y (so the right foot's big toe is on the left), svgY = L - x
+    const pad = 34, w = (maxY - minY) + pad * 2 + 30, h = top + pad * 2;
+    const X = y => (maxY - y) + pad, Y = x => (top - x) + pad;
+    const path = pts.map(([x, y], i) => (i ? 'L' : 'M') + X(y).toFixed(1) + ' ' + Y(x).toFixed(1)).join(' ') + 'Z';
+    const across = xs => spanAt(pts, xs);
+    // Values from a photo or the orthotic solver are not whole millimetres.
+    const mm = v => Math.round(v);
     const xb = 0.69 * L, xh = 0.12 * L;
     const [b0, b1] = across(xb), [h0, h1] = across(xh);
     const rx = X(minY) + 14;
     const s = [];
-    s.push(`<svg class="plan" viewBox="0 0 ${w.toFixed(0)} ${h.toFixed(0)}" role="img" aria-label="Plan view of the ${side} foot outline with length ${L} mm, ball width ${p.ballWidth} mm and heel width ${p.heelWidth} mm">`);
+    s.push(`<svg class="plan" viewBox="0 0 ${w.toFixed(0)} ${h.toFixed(0)}" role="img" aria-label="Plan view of the ${side} foot outline with length ${mm(L)} mm, ball width ${mm(p.ballWidth)} mm and heel width ${mm(p.heelWidth)} mm">`);
     s.push(`<path class="outline" d="${path}"/>`);
     s.push(`<line class="ext" x1="30" y1="${Y(L)}" x2="${rx + 4}" y2="${Y(L)}"/><line class="ext" x1="30" y1="${Y(0)}" x2="${rx + 4}" y2="${Y(0)}"/>`);
     s.push(`<line class="dim" x1="${rx}" y1="${Y(L)}" x2="${rx}" y2="${Y(0)}"/>`);
-    s.push(`<text x="${rx + 4}" y="${(Y(L) + Y(0)) / 2}" transform="rotate(90 ${rx + 4} ${(Y(L) + Y(0)) / 2})" text-anchor="middle">length ${L}</text>`);
+    s.push(`<text x="${rx + 4}" y="${(Y(L) + Y(0)) / 2}" transform="rotate(90 ${rx + 4} ${(Y(L) + Y(0)) / 2})" text-anchor="middle">length ${mm(L)}</text>`);
     s.push(`<line class="dim" x1="${X(b1)}" y1="${Y(xb)}" x2="${X(b0)}" y2="${Y(xb)}"/>`);
-    s.push(`<text x="${(X(b1) + X(b0)) / 2}" y="${Y(xb) - 5}" text-anchor="middle">ball ${p.ballWidth}</text>`);
+    s.push(`<text x="${(X(b1) + X(b0)) / 2}" y="${Y(xb) - 5}" text-anchor="middle">ball ${mm(p.ballWidth)}</text>`);
     s.push(`<line class="dim" x1="${X(h1)}" y1="${Y(xh)}" x2="${X(h0)}" y2="${Y(xh)}"/>`);
-    s.push(`<text x="${(X(h1) + X(h0)) / 2}" y="${Y(xh) - 5}" text-anchor="middle">heel ${p.heelWidth}</text>`);
+    s.push(`<text x="${(X(h1) + X(h0)) / 2}" y="${Y(xh) - 5}" text-anchor="middle">heel ${mm(p.heelWidth)}</text>`);
     s.push(`<text x="2" y="${Y(L) + 3}">toes</text><text x="2" y="${Y(0) + 3}">heel</text>`);
+    if (traced) {
+      s.push('<path class="traced" d="' + traced.map(([x, y], i) => (i ? 'L' : 'M') + X(y).toFixed(1) + ' ' + Y(x).toFixed(1)).join(' ') + 'Z"/>');
+    }
     s.push('</svg>');
     document.getElementById('plan-host').innerHTML = s.join('');
+    if (planNote) planNote.textContent = traced
+      ? 'Solid is the outline generated from your numbers. Dashed is the one read off your photo, laid over it.'
+      : 'Outline generated from your numbers, shown full length. Compare it with your tracing.';
   }
 
   function syncControls() {

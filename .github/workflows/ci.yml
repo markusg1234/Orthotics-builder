@@ -12,5 +12,7 @@ jobs:
           node-version: 20
       - name: Mesh checks
         run: node tests/check_mesh.js
+      - name: Photo checks
+        run: node tests/check_photo.js
       - name: index.html matches the sources
         run: python3 build.py --check
