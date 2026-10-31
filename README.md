@@ -17,7 +17,7 @@ Design 3D-printable foot orthotics from a tape measure. No 3D scan, no CAD skill
 | Forefoot | Metatarsal pad height and position, forefoot post angle |
 | Print | Solid flat base or shell, heel/arch and forefoot thickness, material (TPU, PETG, PLA) |
 
-The preview updates live. You can view one foot or the pair, switch to top, inner-side and heel views, and colour the surface by height. The page warns you about measurements or settings that look unusual.
+The preview updates live. You can view one foot or the pair, switch to top, inner-side and heel views, colour the surface by height, and show the length, width, overall height and arch dimensions on the model. The arch one stands where the arch actually peaks and spans its rise above the base, so it reads the same as the arch height slider rather than the tallest point. A dimension the camera is looking straight down hides itself, so the top view drops the height and the heel view drops the length. The page warns you about measurements or settings that look unusual.
 
 **Download** gives a binary STL in millimetres. The base sits flat on Z = 0 and the toes point along +X. Choosing **Pair** puts both feet side by side in one file. **Save settings** and **Load settings** keep your values in a small JSON file so you can come back and tweak them.
 
