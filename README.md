@@ -1,2 +1,75 @@
-# Orthotics-builder
-Build foot orthotics for your shoes to 3d print
+# Orthotics Builder
+
+Design 3D-printable foot orthotics from a tape measure. No 3D scan, no CAD skills, no install: enter three foot measurements, shape the support with sliders, and download an STL ready for your slicer.
+
+**Use it:** https://markusg1234.github.io/Orthotics-builder/
+
+![Orthotics Builder showing a pair of full-length orthotics coloured by height](docs/screenshot.png)
+
+## What you can adjust
+
+| Area | Settings |
+|---|---|
+| Your foot | Foot length, ball width, heel width, or a starting point from your shoe size (AU/UK, US, EU) |
+| Length | 3/4 (ends behind the ball of the foot), sulcus (ends at the toe crease) or full length |
+| Arch | Height, peak position, how far across the foot it reaches, outer arch |
+| Heel | Heel cup depth, heel lift, rearfoot post angle |
+| Forefoot | Metatarsal pad height and position, forefoot post angle |
+| Print | Solid flat base or shell, heel/arch and forefoot thickness, material (TPU, PETG, PLA) |
+
+The preview updates live. You can view one foot or the pair, switch to top, inner-side and heel views, and colour the surface by height. The page warns you about measurements or settings that look unusual.
+
+**Download** gives a binary STL in millimetres. The base sits flat on Z = 0 and the toes point along +X. Choosing **Pair** puts both feet side by side in one file. **Save settings** and **Load settings** keep your values in a small JSON file so you can come back and tweak them.
+
+## How to measure
+
+1. Stand on a sheet of paper against a wall, with your weight on that foot.
+2. Trace around the foot with the pen held upright.
+3. **Length:** heel line to the tip of the longest toe.
+4. **Ball width:** widest point across the ball, from the big-toe joint to the little-toe joint.
+5. **Heel width:** widest point of the heel, 2–3 cm in from the back.
+6. Measure both feet. They often differ by a few millimetres, so design each one with its own numbers.
+
+The page also draws the outline it generated from your numbers, so you can lay it against your tracing.
+
+## Printing
+
+| Material | Suggested settings |
+|---|---|
+| TPU 95A | 2–3 walls, 15–25% gyroid infill, 20–30 mm/s. Flexible and durable, the best all-round choice. |
+| PETG | 4 walls, 30–40% infill. Firm shell, add a foam top cover for comfort. |
+| PLA | Good for test fits only. It cracks under repeated flexing. |
+
+Print with the flat base on the bed. The solid style needs no supports. The shell style is hollow under the arch and needs supports there.
+
+Start with a modest arch (10–15 mm for most adults), wear the orthotic for a few days, then go up 2 mm at a time.
+
+## How it works
+
+The geometry engine (`src/geometry.js`) is plain JavaScript with no dependencies:
+
+- **Outline.** The inner and outer edges come from monotone cubic curves fitted through stations along the foot, scaled from your length, ball width and heel width. The heel is rounded, and the end of the orthotic is shaped for the length you chose. The big toe is longest at full length, and the 3/4 and sulcus ends follow the slant of the metatarsal heads.
+- **Height field.** The top surface adds up the base thickness, the posts and lifts, the arch (a cosine profile along the foot times a smooth ramp across it), the heel cup (a function of true distance to the edge), and the met pad (a teardrop dome). The heel cup and the arch are blended with a smooth maximum so the cup wall flows into the arch instead of stacking on it.
+- **Mesh.** A 150 × 56 grid, denser near the ends and edges, becomes a top surface, a bottom surface (flat, or following the arch for the shell style) and side walls. The result is a closed, consistently wound mesh. Left feet are mirrored from right feet.
+
+The page (`src/app.html`) uses [three.js](https://threejs.org/) for the preview and [JSZip](https://stuk.github.io/jszip/) for packaged downloads, both loaded from public CDNs.
+
+## Development
+
+```bash
+python3 build.py              # inline src/geometry.js into src/app.html → index.html
+node tests/check_mesh.js      # watertightness and sanity checks across many settings
+python3 build.py --check      # confirm index.html matches the sources
+```
+
+Edit the files in `src/`, then run `build.py`. `index.html` is generated and is what GitHub Pages serves. CI runs the mesh checks and the up-to-date check on every push.
+
+To run it locally, open `index.html` in a browser, or serve the folder with `python3 -m http.server`.
+
+## Safety
+
+These are general-purpose supports, not a medical device, and this tool does not diagnose or treat anything. If you have diabetes, poor circulation, numbness or ongoing foot pain, see a podiatrist before using orthotics you have made yourself. A podiatrist can also give you the arch height and post angles to enter here.
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).
