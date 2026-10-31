@@ -195,6 +195,33 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 
 .file-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .status { min-height: 1.4em; font-size: 12.5px; color: var(--muted); }
 
+/* ---------- Copy an existing orthotic ---------- */
+.steps { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13px; }
+.diagram { display: grid; gap: 4px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); padding: 6px 4px; }
+.plan .b { fill: var(--accent); }
+.plan .bt { fill: var(--accent-ink); font-size: 9px; font-weight: 600; }
+.ofields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.ofield { display: grid; gap: 4px; align-content: start; min-width: 0; }
+.ofield label { font-weight: 500; display: flex; align-items: center; gap: 6px; }
+.ofield input {
+  width: 100%; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg);
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right;
+}
+.ofield .hint { font-size: 11.5px; }
+.badge {
+  display: inline-grid; place-items: center; flex: none; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent); color: var(--accent-ink); font: 600 10px/1 var(--font-mono);
+}
+.wedge { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.copy-result { display: grid; gap: 8px; }
+.copy-result:empty { display: none; }
+.table-wrap { overflow-x: auto; }
+.check { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.check th, .check td { padding: 5px 6px; border-bottom: 1px solid var(--line); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.check th { color: var(--muted); font-weight: 500; }
+.check th:first-child, .check td:first-child { text-align: left; }
+.check td:not(:first-child) { font-family: var(--font-mono); }
+
 /* ---------- Phone layout ---------- */
 @media (max-width: 860px) {
   html, body { height: auto; }
@@ -283,8 +310,8 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 
           <button type="button" data-view="back">Heel</button>
         </div>
         <div class="legend">
-          <label><input type="checkbox" id="heatmap"> Height colours</label>
-          <span class="ramp-wrap" id="ramp-wrap" hidden><span>0</span><span class="ramp"></span><span id="ramp-max">18 mm</span></span>
+          <label><input type="checkbox" id="heatmap" checked> Height colours</label>
+          <span class="ramp-wrap" id="ramp-wrap"><span>0</span><span class="ramp"></span><span id="ramp-max">18 mm</span></span>
         </div>
       </div>
     </section>
@@ -393,6 +420,207 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 
     }
     d.append(body);
     host.append(d);
+  }
+  host.prepend(buildCopy());
+
+  /* ---------- Copy an existing orthotic ---------- */
+  function spanAt(pts, xs) {
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i < pts.length; i++) {
+      const [x1, y1] = pts[i], [x2, y2] = pts[(i + 1) % pts.length];
+      if ((x1 - xs) * (x2 - xs) <= 0 && x1 !== x2) {
+        const y = y1 + ((y2 - y1) * (xs - x1)) / (x2 - x1);
+        lo = Math.min(lo, y); hi = Math.max(hi, y);
+      }
+    }
+    return [lo, hi];
+  }
+  function badge(x, y, n) {
+    return `<circle cx="${x}" cy="${y}" r="7.5" class="b"/><text x="${x}" y="${y + 3.2}" class="bt" text-anchor="middle">${n}</text>`;
+  }
+
+  function copyDiagram() {
+    const P = Object.assign({}, G.DEFAULTS, { side: 'right' });
+    const m = G.measureDesign(P), xe = m.length;
+    // Side view of the inner edge (heights exaggerated 2.5x)
+    const sx = 290 / xe, sz = 2.5, x0 = 40, table = 96;
+    const X = x => x0 + x * sx, Z = z => table - z * sz;
+    let prof = `M${X(0)} ${table} L${X(0)} ${Z(m.heelRim)}`;
+    for (let x = 1; x < xe; x += 2) prof += ` L${X(x).toFixed(1)} ${Z(G.innerEdgeTop(P, x)).toFixed(1)}`;
+    prof += ` L${X(xe)} ${Z(1.2)} L${X(xe)} ${table} Z`;
+    const side = [
+      `<svg class="plan diag" viewBox="0 0 360 132" role="img" aria-label="Side view of an orthotic from the inner edge, showing where to measure heights">`,
+      `<line class="ext" x1="10" y1="${table}" x2="350" y2="${table}"/><text x="350" y="${table + 11}" text-anchor="end">table</text>`,
+      `<path class="outline" d="${prof}"/>`,
+      `<line class="ext" x1="${X(8)}" y1="${Z(m.heelSeat)}" x2="${X(70)}" y2="${Z(m.heelSeat)}"/>`,
+      `<line class="dim" x1="${X(0) - 8}" y1="${table}" x2="${X(0) - 8}" y2="${Z(m.heelRim)}"/>`, badge(X(0) - 20, Z(m.heelRim / 2), 5),
+      `<line class="dim" x1="${X(42)}" y1="${table}" x2="${X(42)}" y2="${Z(m.heelSeat)}"/>`, badge(X(42), Z(m.heelSeat) - 12, 4),
+      `<line class="dim" x1="${X(m.archDist)}" y1="${table}" x2="${X(m.archDist)}" y2="${Z(m.archTop)}"/>`, badge(X(m.archDist) + 13, Z(m.archTop / 2), 6),
+      `<line class="dim" x1="${X(0)}" y1="14" x2="${X(m.archDist)}" y2="14"/><line class="ext" x1="${X(m.archDist)}" y1="14" x2="${X(m.archDist)}" y2="${Z(m.archTop)}"/>`, badge((X(0) + X(m.archDist)) / 2, 14, 7),
+      `<line class="dim" x1="${X(0)}" y1="${table + 22}" x2="${X(xe)}" y2="${table + 22}"/>`, badge((X(0) + X(xe)) / 2, table + 22, 1),
+      `<text x="${X(0)}" y="${table + 11}">heel</text>`,
+      '</svg>'
+    ].join('');
+    // Top view (tracing)
+    const o = G.build(P).outline, s = 1.05, tx = 60, cy = 70;
+    const TX = x => tx + x * s, TY = y => cy - y * s;
+    const path = o.map(([x, y], i) => (i ? 'L' : 'M') + TX(x).toFixed(1) + ' ' + TY(y).toFixed(1)).join(' ') + 'Z';
+    let wx = 0, wbest = 0;
+    for (let x = 0.4 * xe; x < xe; x += 1) { const [a, b] = spanAt(o, x); if (b - a > wbest) { wbest = b - a; wx = x; } }
+    const [w0, w1] = spanAt(o, wx), hx = Math.min(P.heelWidth / 2, 0.2 * P.length), [h0, h1] = spanAt(o, hx);
+    const top = [
+      `<svg class="plan diag" viewBox="0 0 360 132" role="img" aria-label="Top view of the tracing, showing the widest width and the heel width">`,
+      `<path class="outline" d="${path}"/>`,
+      `<line class="dim" x1="${TX(wx)}" y1="${TY(w1)}" x2="${TX(wx)}" y2="${TY(w0)}"/>`, badge(TX(wx) - 16, cy, 2),
+      `<line class="dim" x1="${TX(hx)}" y1="${TY(h1)}" x2="${TX(hx)}" y2="${TY(h0)}"/>`, badge(TX(hx) + 14, cy, 3),
+      `<text x="${TX(xe * 0.45)}" y="${Math.max(10, TY(w1) - 6)}" text-anchor="middle">inner edge</text>`,
+      `<text x="${TX(xe) + 8}" y="${cy + 3}">front</text>`,
+      '</svg>'
+    ].join('');
+    return top + side;
+  }
+
+  function buildCopy() {
+    const DRAFT_KEY = 'orthotics-builder.copy.v1';
+    let draft = {};
+    try { draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || '{}') || {}; } catch (e) { draft = {}; }
+    const state = { coverage: draft.coverage || params.coverage, style: draft.style || params.style };
+
+    const d = el('details', { class: 'sec', id: 'sec-copy' });
+    const s = el('summary');
+    s.append(el('span', { class: 'sec-title' }, 'Copy an existing orthotic'), el('span', { class: 'sec-sub' }, 'Measure and match'));
+    d.append(s);
+    const body = el('div', { class: 'sec-body' });
+    body.append(el('p', { class: 'hint' }, 'Have an orthotic that works for you? Measure it here and the designer will match it. You need a flat table, paper, a pen, a steel rule, and digital calipers if you have them. Measure in millimetres.'));
+    body.append(el('ol', { class: 'steps' },
+      '<li>Lay the orthotic flat on paper and trace around it with the pen held upright. Take <b>1–3</b> from the tracing.</li>' +
+      '<li>Put the orthotic on the table and measure <b>4–6</b> from the table up to the top surface, using the calipers\' depth rod or a steel rule stood on end. Then measure <b>7</b> along the tracing.</li>' +
+      '<li>Add any optional measurements that apply, then press <b>Match this orthotic</b>.</li>'));
+    const diag = el('div', { class: 'diagram' });
+    diag.innerHTML = copyDiagram();
+    body.append(diag);
+
+    const segRow = (label, key, opts) => {
+      const wrap = el('div', { class: 'choice' });
+      wrap.append(el('span', { class: 'field-head' }, '<span style="font-weight:500">' + label + '</span>'));
+      const seg = el('div', { class: 'seg', role: 'group', 'aria-label': label });
+      const paint = () => seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === state[key] ? 'true' : 'false'));
+      for (const [v, t] of opts) {
+        const b = el('button', { type: 'button', id: 'oc-' + key + '-' + v, 'data-v': v }, t);
+        b.addEventListener('click', () => { state[key] = v; paint(); save(); });
+        seg.append(b);
+      }
+      paint();
+      wrap.append(seg);
+      return wrap;
+    };
+    body.append(segRow('Where does it end?', 'coverage', [['3q', 'Behind the ball (3/4)'], ['sulcus', 'Toe crease'], ['full', 'Full']]));
+    body.append(segRow('Underneath the arch', 'style', [['solid', 'Flat'], ['shell', 'Hollow']]));
+
+    const inputs = {};
+    const field = (key, n, label, hint) => {
+      const f = el('div', { class: 'ofield' });
+      const lab = el('label', { for: 'o-' + key }, `<span class="badge" aria-hidden="true">${n}</span>${label}`);
+      const inp = el('input', { type: 'number', id: 'o-' + key, step: '0.1', min: '0', inputmode: 'decimal', placeholder: 'mm' });
+      if (draft[key] != null) inp.value = draft[key];
+      inp.addEventListener('input', save);
+      inputs[key] = inp;
+      f.append(lab, inp, el('p', { class: 'hint' }, hint));
+      return f;
+    };
+    const main = el('div', { class: 'ofields' });
+    [
+      ['length', 1, 'Overall length', 'Back of the heel to the front tip.'],
+      ['maxWidth', 2, 'Widest width', 'Widest point of the tracing.'],
+      ['heelWidth', 3, 'Heel width', 'Across the heel, 2–3 cm in from the back.'],
+      ['heelSeat', 4, 'Heel seat height', 'Top of the middle of the heel seat.'],
+      ['heelRim', 5, 'Heel rim height', 'Top of the heel cup at the very back.'],
+      ['archTop', 6, 'Arch height', 'Top of the inner edge where the arch is highest.'],
+      ['archDist', 7, 'Arch position', 'Back of the heel to that highest point.'],
+      ['foreThick', 8, 'Forefoot thickness', 'Under the ball, with calipers. Toe-crease and full length only.']
+    ].forEach(a => main.append(field(...a)));
+    body.append(main);
+
+    const opt = el('details', { class: 'guide' });
+    opt.append(el('summary', null, 'Optional: met pad, heel lift, wedges'));
+    const ob = el('div', { class: 'guide-body' });
+    const og = el('div', { class: 'ofields' });
+    [
+      ['padHeight', 9, 'Met pad height', 'Height of the dome above the surface around it.'],
+      ['padDist', 10, 'Met pad position', 'Back of the heel to the centre of the dome.'],
+      ['heelLift', 11, 'Heel lift pad', 'Thickness of a separate pad stuck under the heel.']
+    ].forEach(a => og.append(field(...a)));
+    ob.append(og);
+    const wedgeRow = (prefix, n, title, hint) => {
+      const w = el('div', { class: 'field' });
+      w.append(el('span', { class: 'field-head' }, `<span style="font-weight:500;display:flex;align-items:center;gap:6px"><span class="badge" aria-hidden="true">${n}</span>${title}</span>`));
+      const row = el('div', { class: 'wedge' });
+      for (const [k, t] of [['Inner', 'Inner edge'], ['Outer', 'Outer edge'], ['Width', 'Width']]) {
+        const c = el('div', { class: 'ofield' });
+        const key = prefix + k;
+        const inp = el('input', { type: 'number', id: 'o-' + key, step: '0.1', min: '0', inputmode: 'decimal', placeholder: 'mm', 'aria-label': title + ' ' + t.toLowerCase() });
+        if (draft[key] != null) inp.value = draft[key];
+        inp.addEventListener('input', save);
+        inputs[key] = inp;
+        c.append(el('span', { class: 'hint' }, t), inp);
+        row.append(c);
+      }
+      w.append(row, el('p', { class: 'hint' }, hint));
+      return w;
+    };
+    ob.append(wedgeRow('heelWedge', 12, 'Heel wedge (rearfoot post)', 'A wedge stuck under the heel: its thickness at the inner and outer edges, and its width across the foot.'));
+    ob.append(wedgeRow('foreWedge', 13, 'Forefoot wedge (forefoot post)', 'The same for a wedge under the front of the orthotic.'));
+    opt.append(ob);
+    body.append(opt);
+
+    const actions = el('div', { class: 'file-row' });
+    const go = el('button', { type: 'button', class: 'btn primary', id: 'copy-match' }, 'Match this orthotic');
+    const clear = el('button', { type: 'button', class: 'btn', id: 'copy-clear' }, 'Clear measurements');
+    actions.append(go, clear);
+    const result = el('div', { class: 'copy-result', id: 'copy-result', 'aria-live': 'polite' });
+    body.append(actions, result);
+    d.append(body);
+
+    function read() {
+      const m = { coverage: state.coverage, style: state.style };
+      for (const k in inputs) m[k] = inputs[k].value;
+      return m;
+    }
+    function save() {
+      try { localStorage.setItem(DRAFT_KEY, JSON.stringify(read())); } catch (e) { /* ignore */ }
+    }
+    clear.addEventListener('click', () => {
+      for (const k in inputs) inputs[k].value = '';
+      result.innerHTML = '';
+      save();
+    });
+    go.addEventListener('click', () => {
+      const meas = read();
+      const r = G.fromOrthotic(meas, params);
+      if (r.error) { result.innerHTML = ''; result.append(el('div', { class: 'alert' }, r.error)); return; }
+      App.set(r.params, { refit: true });
+      const p = params, md = G.measureDesign(p);
+      const v = k => (meas[k] === '' || meas[k] == null ? null : Number(meas[k]));
+      const rows = [
+        [1, 'Overall length', v('length'), md.length],
+        [2, 'Widest width', v('maxWidth'), md.maxWidth],
+        [3, 'Heel width', v('heelWidth'), p.heelWidth],
+        [4, 'Heel seat height', v('heelSeat'), md.heelSeat],
+        [5, 'Heel rim height', v('heelRim'), md.heelRim],
+        [6, 'Arch height', v('archTop'), v('archDist') != null ? G.innerEdgeTop(p, v('archDist')) : md.archTop]
+      ].filter(r => r[2] != null);
+      const f1 = x => x.toFixed(1);
+      let html = '<p class="hint">Settings updated. Your orthotic compared with the new design, in mm:</p>' +
+        '<div class="table-wrap"><table class="check"><thead><tr><th>Measurement</th><th>Yours</th><th>Design</th></tr></thead><tbody>' +
+        rows.map(([n, l, a, b]) => `<tr><td><span class="badge" aria-hidden="true">${n}</span> ${l}</td><td>${f1(a)}</td><td>${f1(b)}</td></tr>`).join('') +
+        '</tbody></table></div>' +
+        `<p class="hint">That works out at a foot length of ${Math.round(p.length)} mm, ball width ${Math.round(p.ballWidth)} mm, arch ${f1(p.archHeight)} mm at ${Math.round(p.archPeak)}%, heel cup ${f1(p.heelCup)} mm.` +
+        (p.rearPost || p.forePost ? ` Posts: rearfoot ${f1(p.rearPost)}°, forefoot ${f1(p.forePost)}°.` : '') + '</p>';
+      result.innerHTML = html;
+      for (const n of r.notes) result.append(el('div', { class: 'alert' }, n));
+      App.status('Matched your orthotic. Fine-tune it with the sliders below.');
+    });
+    return d;
   }
 
   function buildChoice(f) {
@@ -682,7 +910,11 @@ function rampColor(t, out) {
   return out.copy(RAMP[i]).lerp(RAMP[i + 1], f);
 }
 
-let heat = false;
+// Height colours are on unless this viewer turned them off last time
+let heat = true;
+try { heat = localStorage.getItem('orthotics-builder.heat') !== 'off'; } catch (e) { /* storage unavailable */ }
+document.getElementById('heatmap').checked = heat;
+document.getElementById('ramp-wrap').hidden = !heat;
 function updateFoot(side, mesh) {
   const o = footObject(side);
   o.last = mesh;
@@ -798,6 +1030,7 @@ for (const b of document.querySelectorAll('[data-view]')) b.addEventListener('cl
 document.getElementById('heatmap').addEventListener('change', e => {
   heat = e.target.checked;
   document.getElementById('ramp-wrap').hidden = !heat;
+  try { localStorage.setItem('orthotics-builder.heat', heat ? 'on' : 'off'); } catch (err) { /* ignore */ }
   schedule();
 });
 

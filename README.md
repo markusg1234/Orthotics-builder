@@ -32,6 +32,30 @@ The preview updates live. You can view one foot or the pair, switch to top, inne
 
 The page also draws the outline it generated from your numbers, so you can lay it against your tracing.
 
+## Copy an existing orthotic
+
+Have an orthotic that already works for you, from a podiatrist or a shop? Open **Copy an existing orthotic** at the top of the settings, measure it, and the designer sets itself to match. You need a flat table, paper, a pen, a steel rule, and digital calipers if you have them. All measurements are in millimetres.
+
+1. Note where it ends: behind the ball of the foot (3/4), at the toe crease (sulcus) or full length. Check whether the underside is flat or hollow under the arch.
+2. Lay it flat on paper and trace around it with the pen held upright. From the tracing, measure:
+   1. **Overall length:** back of the heel to the front tip.
+   2. **Widest width:** the widest point of the tracing.
+   3. **Heel width:** across the heel, 2–3 cm in from the back.
+3. Put the orthotic on the table. Measure these heights from the table up to the top surface, with the calipers' depth rod or a steel rule stood on end:
+   4. **Heel seat height:** the middle of the heel seat.
+   5. **Heel rim height:** the top of the heel cup at the very back.
+   6. **Arch height:** the top of the inner edge where the arch is highest.
+4. Measure along the tracing:
+   7. **Arch position:** from the back of the heel to that highest point.
+5. For toe-crease and full-length orthotics, measure the **forefoot thickness** (8) under the ball with calipers.
+6. Optional, only if your orthotic has them:
+   - **Met pad height and position** (9, 10): the dome's height above the surface around it, and the distance from the back of the heel to its centre.
+   - **Heel lift pad** (11): the thickness of a separate pad stuck under the heel.
+   - **Wedges** (12, 13): for a wedge under the heel or the forefoot, its thickness at the inner and outer edges and its width across the foot. The tool turns these into post angles.
+7. Press **Match this orthotic**. The tool works out the settings, then shows your measurements next to the same measurements of the new design so you can check they line up. Fine-tune with the sliders afterwards.
+
+The match is as good as the measurements. Shapes this tool doesn't model, such as a deep skive or an unusual outline, come out as the closest design it can make.
+
 ## Printing
 
 | Material | Suggested settings |

@@ -384,5 +384,145 @@
     return w;
   }
 
-  root.OrthoGeom = { DEFAULTS, LIMITS, COVERAGE_END, build, toSTL, lengthFromShoeSize, warnings, sanitize };
+  /* ---------- Measuring a design the way you would measure a real orthotic ---------- */
+  // Heights are top-surface heights above the table. "Inner edge" is the arch side.
+  function measureDesign(input, opts) {
+    const p = sanitize(input), ol = makeOutline(p), hf = makeHeights(p, ol), L = p.length;
+    const top = (x, y, m, l, d) => hf(x, y, m, l, d)[0];
+    let maxWidth = 0;
+    for (let i = 0; i <= 400; i++) {
+      const [m, l] = ol.edges((ol.xe * i) / 400);
+      if (m + l > maxWidth) maxWidth = m + l;
+    }
+    const out = { length: ol.xe, maxWidth, heelWidth: p.heelWidth };
+    if (opts && opts.widthOnly) return out;
+    // Heel rim: the very back of the heel cup
+    out.heelRim = top(0, 0, 0, 0, 0);
+    // Heel seat: the middle of the heel, where the heel is widest
+    const xs = Math.min(p.heelWidth / 2, 0.2 * L);
+    const [ms, ls] = ol.edges(xs), ys = (ms - ls) / 2;
+    out.heelSeat = top(xs, ys, ms, ls, Math.min(ms - ys, ys + ls));
+    // Arch: height of the inner edge at the arch peak, and how far that is from the back of the heel
+    const fae = Math.min(0.70, ol.xe / L - 0.01);
+    const xa = clamp(p.archPeak / 100, 0.24, fae - 0.08) * L;
+    out.archDist = xa;
+    out.archTop = innerEdgeTop(p, xa);
+    return out;
+  }
+
+  function innerEdgeTop(input, x) {
+    const p = sanitize(input), ol = makeOutline(p), hf = makeHeights(p, ol);
+    const xx = clamp(x, 0.5, ol.xe - 0.5);
+    const [m, l] = ol.edges(xx);
+    return hf(xx, m, m, l, 0)[0];
+  }
+
+  /* ---------- Converting measurements of an existing orthotic into settings ---------- */
+  // meas: { coverage, style, length, maxWidth, heelWidth, heelSeat, heelRim, archTop, archDist,
+  //         foreThick, padHeight, padDist, heelWedgeInner, heelWedgeOuter, heelWedgeWidth,
+  //         foreWedgeInner, foreWedgeOuter, foreWedgeWidth }  (all lengths in mm)
+  function fromOrthotic(meas, base) {
+    const num = k => {
+      const v = meas[k];
+      if (v === '' || v == null) return null;
+      const x = Number(v);
+      return Number.isFinite(x) ? x : null;
+    };
+    const q = Object.assign({}, sanitize(base));
+    if (COVERAGE_END[meas.coverage]) q.coverage = meas.coverage;
+    if (meas.style === 'shell' || meas.style === 'solid') q.style = meas.style;
+
+    const Lo = num('length'), Wo = num('maxWidth');
+    if (!(Lo > 0)) return { error: 'Enter the overall length of the orthotic (measurement 1).' };
+    if (!(Wo > 0)) return { error: 'Enter the widest width of the orthotic (measurement 2).' };
+    const raw = {};
+    raw.length = q.length = Lo / COVERAGE_END[q.coverage];
+
+    // Wedges (posts): angle from the thickness difference across the wedge
+    const wedge = (i, o, w) => {
+      const a = num(i), b = num(o), c = num(w);
+      return a != null && b != null && c > 0 ? (Math.atan((a - b) / c) * 180) / Math.PI : 0;
+    };
+    raw.rearPost = q.rearPost = wedge('heelWedgeInner', 'heelWedgeOuter', 'heelWedgeWidth');
+    raw.forePost = q.forePost = wedge('foreWedgeInner', 'foreWedgeOuter', 'foreWedgeWidth');
+
+    // Outline: heel width as measured, ball width solved so the widest point matches
+    const Ho = num('heelWidth');
+    raw.heelWidth = q.heelWidth = Ho != null ? Ho : 0.66 * Wo;
+    let lo = LIMITS.ballWidth[0], hi = LIMITS.ballWidth[1];
+    for (let i = 0; i < 40; i++) {
+      const mid = (lo + hi) / 2;
+      if (measureDesign(Object.assign({}, q, { ballWidth: mid }), { widthOnly: true }).maxWidth < Wo) lo = mid; else hi = mid;
+    }
+    q.ballWidth = (lo + hi) / 2;
+    if (q.heelWidth > q.ballWidth * 0.95) q.heelWidth = q.ballWidth * 0.95;
+
+    // Thickness from the heel seat height, less any separate heel lift and the rearfoot post under it
+    const seat = num('heelSeat'), liftPad = Math.max(0, num('heelLift') || 0);
+    q.heelLift = liftPad;
+    if (seat != null) {
+      const [tMin, tMax] = LIMITS.shellThick;
+      const postAtSeat = measureDesign(Object.assign({}, q, { shellThick: tMin, heelLift: 0 })).heelSeat - tMin;
+      const rest = seat - postAtSeat - liftPad;
+      if (rest <= tMax) raw.shellThick = rest; else raw.thickOverflow = true;
+      q.shellThick = clamp(rest, tMin, tMax);
+      if (rest > tMax) q.heelLift = liftPad + (rest - tMax);
+    }
+    raw.heelLift = q.heelLift;
+    const fore = num('foreThick');
+    if (fore != null && q.coverage !== '3q') raw.foreThick = q.foreThick = fore;
+
+    // Heel cup from the rim height
+    const rim = num('heelRim');
+    if (rim != null) {
+      const noCup = measureDesign(Object.assign({}, q, { heelCup: 0 })).heelRim;
+      raw.heelCup = q.heelCup = Math.max(0, rim - noCup);
+    }
+
+    // Arch: position from the distance, height solved so the inner-edge high point matches
+    const ad = num('archDist');
+    if (ad != null) raw.archPeak = q.archPeak = (ad / q.length) * 100;
+    const at = num('archTop');
+    if (at != null) {
+      let a0 = LIMITS.archHeight[0], a1 = LIMITS.archHeight[1];
+      const xAt = ad != null ? ad : measureDesign(q).archDist;
+      const h = A => innerEdgeTop(Object.assign({}, q, { archHeight: A }), xAt);
+      if (h(a1) < at) { q.archHeight = a1; raw.archHeight = a1 + (at - h(a1)); }
+      else if (h(a0) >= at) { q.archHeight = 0; raw.archHeight = 0; }
+      else {
+        for (let i = 0; i < 40; i++) { const mid = (a0 + a1) / 2; if (h(mid) < at) a0 = mid; else a1 = mid; }
+        raw.archHeight = q.archHeight = (a0 + a1) / 2;
+      }
+    }
+
+    // Metatarsal pad
+    const ph = num('padHeight'), pd = num('padDist');
+    raw.metPad = q.metPad = ph != null && ph > 0 ? ph : 0;
+    if (q.metPad > 0 && pd != null) raw.metPadPos = q.metPadPos = (pd / q.length) * 100;
+
+    const params = sanitize(q);
+    const notes = [];
+    const label = {
+      length: 'Foot length', heelWidth: 'Heel width', shellThick: 'Heel and arch thickness', foreThick: 'Forefoot thickness',
+      heelCup: 'Heel cup depth', archPeak: 'Arch peak position', archHeight: 'Arch height', metPad: 'Met pad height',
+      metPadPos: 'Met pad position', rearPost: 'Rearfoot post', forePost: 'Forefoot post'
+    };
+    for (const k in raw) {
+      if (!LIMITS[k]) continue;
+      const [a, b] = LIMITS[k];
+      if (raw[k] < a - 1e-6 || raw[k] > b + 1e-6) {
+        notes.push(`${label[k] || k} works out at ${raw[k].toFixed(1)}, outside the tool's range of ${a}–${b}. It was set to ${params[k].toFixed(1)}.`);
+      }
+    }
+    if (params.ballWidth >= LIMITS.ballWidth[1] - 0.01 || params.ballWidth <= LIMITS.ballWidth[0] + 0.01) {
+      notes.push('The widest width is outside what this tool can draw. Check measurement 2.');
+    }
+    if (at != null && params.archHeight === 0 && raw.archHeight === 0) {
+      notes.push('The arch high point is no higher than the base, so the arch was set to 0. Check measurement 6.');
+    }
+    if (raw.thickOverflow) notes.push(`The heel seat is thicker than ${LIMITS.shellThick[1]} mm, so the extra went into heel lift.`);
+    return { params, notes };
+  }
+
+  root.OrthoGeom = { DEFAULTS, LIMITS, COVERAGE_END, build, toSTL, lengthFromShoeSize, warnings, sanitize, measureDesign, innerEdgeTop, fromOrthotic };
 })(typeof window !== 'undefined' ? window : globalThis);

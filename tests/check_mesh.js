@@ -56,3 +56,30 @@ if (stl.byteLength !== 84 + 50 * n) { failed++; console.error('FAIL STL size'); 
 
 if (failed) { console.error(`${failed} check(s) failed`); process.exit(1); }
 console.log(`all ${cases.length * 2} mesh cases and the STL writer passed`);
+
+// Round trip: measure a design the way a person would measure a real orthotic,
+// convert the measurements back into settings, and expect the same settings.
+const designs = [
+  {},
+  { coverage: 'full', archHeight: 12, heelCup: 15, metPad: 4, metPadPos: 62, foreThick: 2.5 },
+  { coverage: 'sulcus', style: 'shell', archHeight: 20, archPeak: 45, rearPost: 4, shellThick: 3.5 },
+  { length: 240, ballWidth: 92, heelWidth: 60, heelLift: 5, rearPost: -3, forePost: 3, coverage: 'full' }
+];
+const keys = ['length', 'ballWidth', 'heelWidth', 'shellThick', 'heelLift', 'heelCup', 'archHeight', 'archPeak', 'metPad', 'metPadPos', 'rearPost', 'forePost'];
+let rtFailed = 0;
+for (const d of designs) {
+  const P = G.sanitize(d), m = G.measureDesign(P), rad = a => (a * Math.PI) / 180;
+  const meas = {
+    coverage: P.coverage, style: P.style, length: m.length, maxWidth: m.maxWidth, heelWidth: P.heelWidth,
+    heelSeat: m.heelSeat, heelRim: m.heelRim, archTop: m.archTop, archDist: m.archDist, heelLift: P.heelLift,
+    foreThick: P.coverage !== '3q' ? P.foreThick : '', padHeight: P.metPad, padDist: (P.metPadPos / 100) * P.length,
+    heelWedgeInner: Math.max(0, Math.tan(rad(P.rearPost)) * 60), heelWedgeOuter: Math.max(0, -Math.tan(rad(P.rearPost)) * 60), heelWedgeWidth: 60,
+    foreWedgeInner: Math.max(0, Math.tan(rad(P.forePost)) * 90), foreWedgeOuter: Math.max(0, -Math.tan(rad(P.forePost)) * 90), foreWedgeWidth: 90
+  };
+  const r = G.fromOrthotic(meas, G.DEFAULTS);
+  const bad = r.error ? [r.error] : keys.filter(k => Math.abs(r.params[k] - P[k]) > 0.1).map(k => `${k} ${P[k]} → ${r.params[k].toFixed(2)}`);
+  if (bad.length) { rtFailed++; console.error(`FAIL round trip ${JSON.stringify(d)}: ${bad.join(', ')}`); }
+}
+if (G.fromOrthotic({ length: '' }, G.DEFAULTS).error === undefined) { rtFailed++; console.error('FAIL missing length not reported'); }
+if (rtFailed) { console.error(`${rtFailed} round-trip check(s) failed`); process.exit(1); }
+console.log(`all ${designs.length} measure-and-match round trips passed`);
