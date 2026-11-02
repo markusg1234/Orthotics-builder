@@ -2074,9 +2074,10 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 
 
     const d = el('details', { class: 'sec', id: 'sec-photo' });
     const s = el('summary');
-    s.append(el('span', { class: 'sec-title' }, 'Measure from a photo'), el('span', { class: 'sec-sub' }, 'Phone and paper'));
+    s.append(el('span', { class: 'sec-title' }, 'Measure from a photo'), el('span', { class: 'sec-sub' }, 'Experimental'));
     d.append(s);
     const body = el('div', { class: 'sec-body' });
+    body.append(el('div', { class: 'alert' }, 'Experimental, so results may be off. Check them against a tape measure before you print.'));
     body.append(el('p', { class: 'hint' }, 'Photograph a sheet of paper and the page reads the measurements off it. The sheet is a known size, so its four corners cancel out the angle you held the camera at.'));
 
     const pick = el('div', { class: 'flowpick', role: 'group', 'aria-label': 'What the photo shows' });

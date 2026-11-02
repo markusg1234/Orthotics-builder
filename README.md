@@ -34,7 +34,7 @@ The page also draws the outline it generated from your numbers, so you can lay i
 
 ## Photograph it instead
 
-**Measure from a photo** at the top of the settings reads the measurements off a photo, so you need a phone and a sheet of paper rather than a tape measure. The sheet is a known size, so marking its four corners cancels out the angle you held the camera at, instead of just scaling by a reference length. Expect about a millimetre or two, which is as good as a careful tape measure.
+**Measure from a photo** at the top of the settings reads the measurements off a photo, so you need a phone and a sheet of paper rather than a tape measure. The sheet is a known size, so marking its four corners cancels out the angle you held the camera at, instead of just scaling by a reference length. This feature is experimental. Its automated checks run on synthesised photos rather than real ones, so results may be off: check them against a tape measure before you print.
 
 Photograph the sheet so it fills the frame, in even light, avoiding an ultra-wide lens. The page tries to find the sheet by itself and puts four markers on its corners; drag any that are off, or nudge them with the arrow keys. Four things it can read:
 
